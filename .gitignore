@@ -6,7 +6,7 @@ __pycache__/
 *.pyd
 .Python
 *.egg-info/
-
+*.pckl
 # 环境变量文件 (包含敏感API密钥)
 .env
 .env.local
@@ -115,3 +115,4 @@ COMMIT_SUMMARY.md
 .history/
 
 works/
+.pckl

@@ -1,0 +1,28 @@
+[project]
+name = "agent-adaptation-finance"
+version = "0.1.0"
+description = "多Agent金融市场仿真系统 - 模拟不同群体对市场消息的反应"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=0.4",
+    "langchain>=0.3",
+    "langchain-openai>=0.3",
+    "langchain-anthropic>=0.3",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "json-repair>=0.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
