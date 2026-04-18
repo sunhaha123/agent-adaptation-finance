@@ -6,6 +6,10 @@
 >
 > 每个 Agent 的本质是：用 `agents/*.md` 中定义的角色、思维方式和风险偏好作为 `agent_prompt`，再输入统一抽取后的市场信号 `news_signal`，由 LLM 生成结构化决策意向 `AgentResponse`。
 
+> **v2 涌现闭环：`Order = policy(genome, PrototypeSignal, market_state, social_state)`**
+>
+> 在 `--mode evolve` 下，初始新闻会先扩展成一串市场事件；LLM 只生成事件链和群体原型信号，后续多轮交易由可遗传的数值基因 `genome`、订单簿撮合、价格反馈和羊群行为共同驱动，最后通过遗传算法保留高 fitness 的策略参数。
+
 ## 它能做什么
 
 输入一条新闻：
@@ -28,7 +32,7 @@ python main.py "美联储宣布加息50基点"
     ↓
 系统把新闻结构化（利多/利空、强度、影响哪些资产）
     ↓
-7个 Agent 并行读取新闻，各自独立思考
+所有 Agent 并行读取新闻，各自独立思考
     ↓
 每个 Agent 输出：立场 + 置信度 + 操作建议 + 推理过程
     ↓
@@ -88,7 +92,62 @@ python main.py "英伟达财报大超预期，营收同比增长200%"
 
 # 不传消息会用默认的
 python main.py
+
+# 多轮涌现 + 遗传算法仿真
+python main.py "美联储宣布加息50基点" \
+  --mode evolve \
+  --rounds 50 \
+  --generations 20 \
+  --population 120 \
+  --events 8 \
+  --seed 42
+
+# 用户自己输入事件串，更推荐放文件
+python main.py --mode evolve --events-file events.txt
 ```
+
+`single` 是默认模式，输出每个群体的一轮决策意向。`evolve` 会把初始新闻扩展为事件链；如果你直接输入或通过 `--events-file` 提供多行 `阶段标题：事件描述`，系统会按你给的事件串推进仿真，不再自动生成事件链。随后它会把每个 `agents/*.md` 当作一个群体原型，生成个体 population，围绕单一指数 `MARKET_INDEX` 进行多轮订单簿撮合，并输出事件串、价格路径、羊群指数、fitness、最优个体和涌现报告。
+
+## v2 涌现仿真做了什么
+
+```
+初始新闻 → event_timeline
+    ↓
+输出“阶段标题：事件描述”形式的事件串
+    ↓
+每个事件 → event_signal
+    ↓
+每类 Agent 原型信号随事件阶段调整 → PrototypeSignal_t
+    ↓
+生成多个个体，每个个体持有 genome
+    ↓
+policy(genome, PrototypeSignal_t, market_state, social_state) → Order
+    ↓
+订单簿撮合 → 新价格、成交量、收益反馈
+    ↓
+下一段事件、羊群行为和价格趋势共同影响下一轮决策
+    ↓
+每代结束后按 fitness 遗传选择、交叉、变异
+```
+
+用户自定义事件串格式：
+
+```text
+前期对抗升级：美伊关系恶化，地区驻军、舰队与防空力量加强部署，市场开始计入中东地缘风险溢价。
+战争爆发：美国与以色列对伊朗关键军事/核相关/指挥目标实施打击，冲突从威慑转为公开战争。
+停火窗口出现：在多方调停下，双方接受临时停火或降烈度安排，市场开始交易“最坏情形避免”。
+```
+
+这里的 `genome` 包括：
+
+- `risk_appetite`: 风险偏好
+- `signal_sensitivity`: 对新闻和原型信号的敏感度
+- `herd_coefficient`: 羊群系数
+- `contrarian_bias`: 逆向倾向
+- `confidence_threshold`: 出手阈值
+- `position_limit`: 最大仓位
+
+这对应论文里的适应性机制：感知 `P` 来自事件链和市场状态，目标 `G` 和偏好 `I` 来自群体 prompt 与 genome，操作 `A` 从文字建议升级为真实订单，反馈学习来自价格和收益更新，进化来自遗传算法。
 
 ## 项目结构
 
@@ -108,8 +167,16 @@ python main.py
 │   │       └── generate_report.py     # 生成对比报告
 │   ├── agent_runtime/
 │   │   └── agent_factory.py # 读取 .md 配置 → 创建并运行 Agent
+│   ├── simulation/          # v2 多轮涌现 + 遗传算法仿真
+│   │   ├── engine.py        # 主仿真流程
+│   │   ├── order_book.py    # 单一指数订单簿撮合
+│   │   ├── events.py        # 初始新闻 → 事件链
+│   │   ├── policy.py        # genome → order
+│   │   ├── feedback.py      # 收益、fitness、社会信号
+│   │   └── genetics.py      # 选择、交叉、变异
 │   └── schemas/
-│       └── response.py      # AgentResponse 等数据模型
+│       ├── response.py      # AgentResponse 等数据模型
+│       └── evolution.py     # genome、order、trade、market state
 ├── docs/
 │   ├── implementation_plan.md         # 实现计划
 │   └── agent_finance_paper_markdown.md # 参考论文
