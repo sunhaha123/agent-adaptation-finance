@@ -5,6 +5,7 @@ from src.schemas.evolution import (
     GenerationSummary,
     MarketEvent,
     MarketState,
+    Order,
     RoundSnapshot,
     SocialState,
 )
@@ -25,6 +26,19 @@ from src.simulation.utils import mean
 
 MARKET_SYMBOL = "MARKET_INDEX"
 INITIAL_PRICE = 100.0
+MM_DEPTH_FRACTION = 0.02
+
+
+def _market_maker_orders(price: float, total_equity: float, rng: random.Random) -> list[Order]:
+    notional = total_equity * MM_DEPTH_FRACTION
+    quantity = notional / price
+    spread = 0.003 + rng.uniform(0.0, 0.002)
+    return [
+        Order(individual_id="__mm__", side="buy", quantity=quantity,
+               limit_price=price * (1.0 - spread), intent=0.0),
+        Order(individual_id="__mm__", side="sell", quantity=quantity,
+               limit_price=price * (1.0 + spread), intent=0.0),
+    ]
 
 
 def generate_archetype_signals(agent_configs: dict[str, str], news_signal: dict) -> dict[str, dict]:
@@ -87,7 +101,7 @@ def run_evolution_simulation(
         event_schedule.extend((last_event, last_event.rounds - 1) for _ in range(total_rounds - len(event_schedule)))
 
     archetype_ids = sorted(archetype_responses.keys())
-    population = initialize_population(archetype_ids, population_size, initial_price, rng)
+    population = initialize_population(archetype_ids, population_size, initial_price, rng, market_structure=None)
     market_state = MarketState(
         round_index=0,
         price=initial_price,
@@ -123,9 +137,13 @@ def run_evolution_simulation(
                     market_state,
                     social_state,
                     rng,
+                    reference_price=initial_price,
                 )
                 if order is not None:
                     orders.append(order)
+
+            total_equity = sum(a.current_equity for a in population)
+            orders.extend(_market_maker_orders(market_state.price, total_equity, rng))
 
             trades, next_market = match_order_book(orders, market_state, recent_returns)
             apply_trades(population, trades)
@@ -185,6 +203,7 @@ def run_evolution_simulation(
                 market_state.price,
                 rng,
                 generation=generation + 1,
+                market_structure=None,
             )
             generation_summaries[-1].group_weights = evolved_weights
 

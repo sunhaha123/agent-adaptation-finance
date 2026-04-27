@@ -32,7 +32,13 @@ def group_average_fitness(population: list[AgentRuntimeState]) -> dict[str, floa
     return {key: mean(values) for key, values in sorted(by_group.items())}
 
 
-def evolved_group_weights(population: list[AgentRuntimeState]) -> dict[str, float]:
+def evolved_group_weights(
+    population: list[AgentRuntimeState],
+    market_structure: dict[str, dict[str, float]] | None = None,
+) -> dict[str, float]:
+    from src.simulation.population import MARKET_STRUCTURE
+
+    structure = market_structure or MARKET_STRUCTURE
     base_weights = population_weights(population)
     averages = group_average_fitness(population)
     if not averages:
@@ -48,6 +54,9 @@ def evolved_group_weights(population: list[AgentRuntimeState]) -> dict[str, floa
         key: 0.80 * base_weights.get(key, 0.0) + 0.20 * fitness_weights.get(key, 0.0)
         for key in keys
     }
+    for key in mixed:
+        floor = structure.get(key, {}).get("min_weight", 0.05)
+        mixed[key] = max(mixed[key], floor)
     total = sum(mixed.values()) or 1.0
     return {key: value / total for key, value in mixed.items()}
 
@@ -71,11 +80,12 @@ def evolve_population(
     rng: random.Random,
     generation: int,
     elite_fraction: float = 0.10,
+    market_structure: dict[str, dict[str, float]] | None = None,
 ) -> tuple[list[AgentRuntimeState], dict[str, float]]:
     if not population:
         raise ValueError("population 不能为空")
 
-    weights = evolved_group_weights(population)
+    weights = evolved_group_weights(population, market_structure=market_structure)
     sorted_agents = sorted(population, key=lambda agent: agent.fitness, reverse=True)
     elite_count = max(1, min(target_size, int(target_size * elite_fraction)))
 

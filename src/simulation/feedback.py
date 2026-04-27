@@ -10,17 +10,19 @@ def apply_trades(
 ) -> None:
     agents = {agent.individual_id: agent for agent in population}
     for trade in trades:
-        buyer = agents[trade.buyer_id]
-        seller = agents[trade.seller_id]
+        buyer = agents.get(trade.buyer_id)
+        seller = agents.get(trade.seller_id)
         notional = trade.quantity * trade.price
 
-        buyer.cash -= notional
-        buyer.position += trade.quantity
-        buyer.turnover += notional / buyer.initial_equity
+        if buyer:
+            buyer.cash -= notional
+            buyer.position += trade.quantity
+            buyer.turnover += notional / buyer.initial_equity
 
-        seller.cash += notional
-        seller.position -= trade.quantity
-        seller.turnover += notional / seller.initial_equity
+        if seller:
+            seller.cash += notional
+            seller.position -= trade.quantity
+            seller.turnover += notional / seller.initial_equity
 
 
 def update_population_after_market(
@@ -53,8 +55,9 @@ def build_social_state(
     population: list[AgentRuntimeState],
     orders: list[Order],
 ) -> SocialState:
-    buy_qty = sum(order.quantity for order in orders if order.side == "buy")
-    sell_qty = sum(order.quantity for order in orders if order.side == "sell")
+    agent_orders = [o for o in orders if not o.individual_id.startswith("__")]
+    buy_qty = sum(order.quantity for order in agent_orders if order.side == "buy")
+    sell_qty = sum(order.quantity for order in agent_orders if order.side == "sell")
     total_qty = buy_qty + sell_qty
     majority_action = (buy_qty - sell_qty) / total_qty if total_qty > 0 else 0.0
     herd_index = abs(majority_action)

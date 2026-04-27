@@ -317,12 +317,12 @@ def adapt_archetype_response(
     event_confidence = float(event_signal.get("confidence", 0.6))
 
     style = {
-        "passive_fund": {"signal": 0.10, "contrarian": 0.00, "intensity": 0.25},
-        "retail_momentum": {"signal": 1.00, "contrarian": 0.00, "intensity": 1.15},
-        "retail_contrarian": {"signal": 0.35, "contrarian": 0.70, "intensity": 0.85},
-        "quant_fund": {"signal": 0.80, "contrarian": 0.10, "intensity": 1.00},
-        "mutual_fund": {"signal": 0.45, "contrarian": 0.25, "intensity": 0.65},
-        "macro_fund": {"signal": 0.75, "contrarian": 0.20, "intensity": 0.95},
+        "passive_fund": {"signal": 0.05, "contrarian": 0.00, "intensity": 0.15},
+        "retail_momentum": {"signal": 1.00, "contrarian": 0.00, "intensity": 1.20},
+        "retail_contrarian": {"signal": 0.25, "contrarian": 0.75, "intensity": 0.80},
+        "quant_fund": {"signal": 0.85, "contrarian": 0.15, "intensity": 1.05},
+        "mutual_fund": {"signal": 0.35, "contrarian": 0.20, "intensity": 0.50},
+        "macro_fund": {"signal": 0.70, "contrarian": 0.30, "intensity": 0.90},
     }.get(archetype_id, {"signal": 0.60, "contrarian": 0.15, "intensity": 0.80})
 
     baseline_score = stance_to_score(baseline_response.get("stance", "neutral"))

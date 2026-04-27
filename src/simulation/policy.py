@@ -10,6 +10,7 @@ def compute_order_intent(
     news_signal: dict,
     market_state: MarketState,
     social_state: SocialState,
+    reference_price: float | None = None,
 ) -> float:
     genome = agent.genome
     prototype_score = (
@@ -26,18 +27,32 @@ def compute_order_intent(
 
     signal_component = 0.45 * prototype_score + 0.35 * genome.signal_sensitivity * news_score
     news_contrarian_component = -0.25 * genome.contrarian_bias * news_score
-    herd_component = 0.35 * genome.herd_coefficient * social_state.majority_action
+
+    herd_damping = max(0.05, 1.0 - social_state.herd_index ** 2)
+    herd_component = 0.35 * genome.herd_coefficient * social_state.majority_action * herd_damping
     contrarian_component = -0.35 * genome.contrarian_bias * social_state.majority_action
     trend_component = recent_return_score * (
         0.25 * (1.0 - genome.contrarian_bias) - 0.15 * genome.contrarian_bias
     )
+
+    mean_reversion_component = 0.0
+    if reference_price is not None and reference_price > 0:
+        price_deviation = (market_state.price - reference_price) / reference_price
+        if price_deviation < 0:
+            reversion_signal = -clamp(price_deviation * 3.0, -1.0, 1.0)
+            reversion_weight = 0.20 + 0.25 * genome.contrarian_bias
+        else:
+            reversion_signal = -clamp(price_deviation * 5.0, -1.0, 1.0)
+            reversion_weight = 0.30 + 0.15 * genome.contrarian_bias
+        mean_reversion_component = reversion_weight * reversion_signal
 
     return clamp(
         signal_component
         + news_contrarian_component
         + herd_component
         + contrarian_component
-        + trend_component,
+        + trend_component
+        + mean_reversion_component,
         -1.0,
         1.0,
     )
@@ -50,8 +65,9 @@ def generate_order(
     market_state: MarketState,
     social_state: SocialState,
     rng: random.Random,
+    reference_price: float | None = None,
 ) -> Order | None:
-    intent = compute_order_intent(agent, archetype_response, news_signal, market_state, social_state)
+    intent = compute_order_intent(agent, archetype_response, news_signal, market_state, social_state, reference_price)
     if abs(intent) < agent.genome.confidence_threshold:
         agent.last_action = "hold"
         return None
